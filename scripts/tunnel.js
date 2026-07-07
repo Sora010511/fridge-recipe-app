@@ -17,6 +17,19 @@ async function main() {
   console.log(`公開URL: ${listener.url()}`);
   console.log("このURLに APP_USERNAME / APP_PASSWORD でログインしてアクセスできます。");
   console.log("終了するには Ctrl+C を押してください。");
+
+  // ngrokのリスナーはNode.jsのイベントループを維持するハンドルを持たないため、
+  // 何もしないとJSの呼び出しスタックが空になった時点でプロセスごと終了してしまう。
+  // タイマーを1つ張っておくことで、Ctrl+C等で明示的に止めるまで待機させる。
+  const keepAlive = setInterval(() => {}, 1 << 30);
+
+  const shutdown = async () => {
+    clearInterval(keepAlive);
+    await listener.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 main().catch((err) => {
