@@ -1,11 +1,13 @@
+// 2026年5月の楽天API仕様移行により、旧 app.rakuten.co.jp は廃止され
+// openapi.rakuten.co.jp + applicationId/accessKey/Origin ヘッダーの方式に変更された。
 const CATEGORY_LIST_URL =
-  "https://app.rakuten.co.jp/services/api/Recipe/CategoryList/20170426";
+  "https://openapi.rakuten.co.jp/recipems/api/Recipe/CategoryList/20170426";
 const CATEGORY_RANKING_URL =
-  "https://app.rakuten.co.jp/services/api/Recipe/CategoryRanking/20170426";
+  "https://openapi.rakuten.co.jp/recipems/api/Recipe/CategoryRanking/20170426";
 
 class RakutenNotConfiguredError extends Error {
   constructor() {
-    super("RAKUTEN_APP_ID が設定されていません");
+    super("RAKUTEN_APP_ID または RAKUTEN_ACCESS_KEY が設定されていません");
     this.name = "RakutenNotConfiguredError";
   }
 }
@@ -27,12 +29,29 @@ function setCached(key, data, ttlMs) {
   cache.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
 
-function getAppId() {
+function getCredentials() {
   const appId = process.env.RAKUTEN_APP_ID;
-  if (!appId) {
+  const accessKey = process.env.RAKUTEN_ACCESS_KEY;
+  const origin = process.env.RAKUTEN_ORIGIN;
+  if (!appId || !accessKey || !origin) {
     throw new RakutenNotConfiguredError();
   }
-  return appId;
+  return { appId, accessKey, origin };
+}
+
+async function callRakutenApi(baseUrl, params) {
+  const { appId, accessKey, origin } = getCredentials();
+  const query = new URLSearchParams({ ...params, applicationId: appId, format: "json" });
+  const res = await fetch(`${baseUrl}?${query.toString()}`, {
+    headers: {
+      accessKey,
+      Origin: origin,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`楽天APIエラー: ${res.status}`);
+  }
+  return res.json();
 }
 
 async function fetchCategoryList() {
@@ -40,13 +59,7 @@ async function fetchCategoryList() {
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  const appId = getAppId();
-  const url = `${CATEGORY_LIST_URL}?applicationId=${encodeURIComponent(appId)}&format=json`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`楽天カテゴリ一覧APIエラー: ${res.status}`);
-  }
-  const data = await res.json();
+  const data = await callRakutenApi(CATEGORY_LIST_URL, {});
   setCached(cacheKey, data, 24 * 60 * 60 * 1000); // 24時間
   return data;
 }
@@ -56,13 +69,7 @@ async function fetchCategoryRanking(categoryId) {
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  const appId = getAppId();
-  const url = `${CATEGORY_RANKING_URL}?applicationId=${encodeURIComponent(appId)}&categoryId=${encodeURIComponent(categoryId)}&format=json`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`楽天ランキングAPIエラー(category=${categoryId}): ${res.status}`);
-  }
-  const data = await res.json();
+  const data = await callRakutenApi(CATEGORY_RANKING_URL, { categoryId });
   const recipes = data.result || [];
   setCached(cacheKey, recipes, 60 * 60 * 1000); // 1時間
   return recipes;
