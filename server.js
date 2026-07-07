@@ -2,12 +2,14 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 
+const basicAuth = require("./src/basicAuth");
 const ingredientsRouter = require("./src/routes/ingredients");
 const recipesRouter = require("./src/routes/recipes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(basicAuth);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 

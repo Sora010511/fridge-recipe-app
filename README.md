@@ -33,6 +33,28 @@ npm start
 
 `http://localhost:3000` （同一Wi-Fi内のスマホからは `http://<PCのIPアドレス>:3000`）でアクセスできます。
 
+アクセスすると `APP_USERNAME` / `APP_PASSWORD`（簡易ログイン）を求められます。
+未設定の場合、全リクエストが拒否されるので、必ず `.env` に設定してください。
+
+## 外部（自宅Wi-Fi外）からアクセスしたい場合
+
+ngrokトンネルを使って一時的な公開URLを発行できます。
+
+1. https://ngrok.com/ で無料アカウントを作成
+2. https://dashboard.ngrok.com/get-started/your-authtoken でauthtokenを取得し、`.env` の `NGROK_AUTHTOKEN` に設定
+3. `.env` の `APP_USERNAME` / `APP_PASSWORD` を、推測されにくい値に変更しておく（初期値はセットアップ時の仮パスワード）
+4. ターミナルを2つ開き、それぞれで以下を実行
+   ```bash
+   npm start        # ターミナル1：アプリ本体
+   npm run tunnel    # ターミナル2：ngrokトンネル
+   ```
+5. `npm run tunnel` の出力に表示される `公開URL` にアクセスし、`APP_USERNAME` / `APP_PASSWORD` でログインする
+
+**注意**
+- 無料プランではトンネルを起動し直すたびにURLが変わります
+- 公開中は誰でもそのURLにアクセスを試みる可能性があるため、`APP_PASSWORD` は必ず推測されにくいものに変更してください
+- 使い終わったら `npm run tunnel` を `Ctrl+C` で終了すれば公開は止まります
+
 ## 設定項目（.env）
 
 | 変数 | 説明 | 既定値 |
@@ -42,6 +64,8 @@ npm start
 | `RAKUTEN_ORIGIN` | 楽天アプリ登録時の「アプリケーションURL」と同じ値 | （必須） |
 | `PORT` | サーバーのポート番号 | 3000 |
 | `RECIPE_CATEGORY_LIMIT` | レシピ検索時に問い合わせる中カテゴリの件数上限。多いほど候補レシピが増えるが楽天APIの呼び出し回数も増える | 20 |
+| `APP_USERNAME` / `APP_PASSWORD` | 簡易ログイン（Basic認証）の資格情報 | （必須） |
+| `NGROK_AUTHTOKEN` | ngrokで外部公開する場合のみ必要 | （外部公開時のみ必須） |
 
 ## データ
 
