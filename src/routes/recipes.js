@@ -11,7 +11,7 @@ router.get("/", async (req, res) => {
   const categoryLimit = Number(process.env.RECIPE_CATEGORY_LIMIT) || 20;
 
   try {
-    const candidates = await fetchCandidateRecipes(categoryLimit);
+    const candidates = await fetchCandidateRecipes(categoryLimit, ingredients);
     const ranked = rankRecipes(candidates, ingredients);
     res.json({ recipes: ranked });
   } catch (err) {

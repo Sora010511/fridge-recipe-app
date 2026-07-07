@@ -1,3 +1,5 @@
+const { normalize } = require("./normalize");
+
 // 2026年5月の楽天API仕様移行により、旧 app.rakuten.co.jp は廃止され
 // openapi.rakuten.co.jp + applicationId/accessKey/Origin ヘッダーの方式に変更された。
 const CATEGORY_LIST_URL =
@@ -75,12 +77,31 @@ async function fetchCategoryRanking(categoryId) {
   return recipes;
 }
 
-// 中カテゴリの候補を先頭から limit 件選び、各カテゴリの人気ランキング(上位4件)を取得して集約する。
-// カテゴリの選定基準は要件書9章の通りMVPでは簡易固定とし、使用感を見ながら調整する前提。
-async function fetchCandidateRecipes(limit) {
+// 登録食材名とカテゴリ名が一致する中カテゴリを優先的に選び、残り枠を先頭からの
+// カテゴリで埋める。カテゴリ数自体の上限(limit)は変えず、登録食材に関係の薄い
+// カテゴリばかり呼び出してしまうのを避けるための優先度付けのみを行う。
+function selectTargetCategories(mediumCategories, ingredientNames, limit) {
+  const normalizedIngredients = ingredientNames.map(normalize).filter(Boolean);
+
+  const relevant = [];
+  const others = [];
+  for (const cat of mediumCategories) {
+    const normalizedCategoryName = normalize(cat.categoryName || "");
+    const isRelevant = normalizedIngredients.some(
+      (ing) => normalizedCategoryName.includes(ing) || ing.includes(normalizedCategoryName)
+    );
+    (isRelevant ? relevant : others).push(cat);
+  }
+
+  return [...relevant, ...others].slice(0, limit);
+}
+
+// 中カテゴリの候補を最大 limit 件選び、各カテゴリの人気ランキング(上位4件)を取得して集約する。
+// カテゴリの選定基準は要件書9章の通りMVPでは簡易な優先度付けとし、使用感を見ながら調整する前提。
+async function fetchCandidateRecipes(limit, ingredientNames = []) {
   const categoryList = await fetchCategoryList();
   const mediumCategories = (categoryList.result && categoryList.result.medium) || [];
-  const targetCategories = mediumCategories.slice(0, limit);
+  const targetCategories = selectTargetCategories(mediumCategories, ingredientNames, limit);
 
   const recipeLists = await Promise.all(
     targetCategories.map((cat) =>
